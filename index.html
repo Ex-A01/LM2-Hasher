@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hex Viewer with Highlighting, Hashing & Highlight List</title>
+    <style>
+        body {
+            font-family: monospace;
+            background-color: #222;
+            color: #ccc;
+            padding: 20px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+        }
+        .hex-editor {
+            display: grid;
+            grid-template-columns: 100px 500px 200px;
+            gap: 10px;
+        }
+        .hex-line {
+            display: contents;
+        }
+        .address, .hex, .ascii {
+            white-space: pre;
+        }
+        .address {
+            color: #00ff00;
+        }
+        .hex {
+            color: #ffFFff;
+        }
+        .ascii {
+            color: #fff;
+        }
+        .highlighted {
+            background-color: yellow;
+        }
+        .highlight-list {
+            padding: 10px;
+            background-color: #333;
+            border-radius: 8px;
+            height: fit-content;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .highlight-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .color-box {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+        }
+        .highlight-label {
+            margin-right: 10px;
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hex Viewer with Highlighting, Hashing & Highlight List</h1>
+
+    <!-- File input -->
+    <input type="file" id="fileInput">
+    
+    <!-- Form to highlight bytes -->
+    <div>
+        <label for="byteSequence">Byte Sequence (Hex): </label>
+        <input type="text" id="byteSequence" placeholder="e.g., 70 02 92">
+        
+        <label for="highlightColor">Highlight Color: </label>
+        <input type="color" id="highlightColor" value="#ffff00">
+        
+        <button id="highlightButton">Highlight</button>
+    </div>
+
+    <!-- Hash input -->
+    <div>
+        <label for="hashInput">Text to Hash: </label>
+        <input type="text" id="hashInput" placeholder="Enter text">
+        <button id="hashButton">Compute Hash</button>
+        <div id="hashOutput"></div>
+    </div>
+
+    <!-- Container holding hex editor and highlight list side by side -->
+    <div class="container">
+        <!-- Hex editor display -->
+        <div id="hexEditor" class="hex-editor"></div>
+
+        <!-- Highlight list -->
+        <div class="highlight-list">
+            <h2>Highlight List</h2>
+            <div id="highlightList"></div>
+        </div>
+    </div>
+
+    <script>
+        let byteArray = [];
+        let highlightList = [];
+
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const arrayBuffer = e.target.result;
+                byteArray = new Uint8Array(arrayBuffer);
+                displayHex(byteArray);
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function displayHex(byteArray) {
+            const hexEditor = document.getElementById('hexEditor');
+            hexEditor.innerHTML = ''; // Clear previous content
+
+            const bytesPerLine = 16;
+            for (let i = 0; i < byteArray.length; i += bytesPerLine) {
+                const hexLine = document.createElement('div');
+                hexLine.className = 'hex-line';
+
+                // Address
+                const address = document.createElement('div');
+                address.className = 'address';
+                address.textContent = i.toString(16).padStart(8, '0') + ':';
+                hexLine.appendChild(address);
+
+                // Hex bytes
+                const hexBytes = document.createElement('div');
+                hexBytes.className = 'hex';
+                for (let j = 0; j < bytesPerLine; j++) {
+                    const byteIndex = i + j;
+                    if (byteIndex < byteArray.length) {
+                        const byteHex = byteArray[byteIndex].toString(16).padStart(2, '0');
+                        const byteSpan = document.createElement('span');
+                        byteSpan.className = 'byte';
+                        byteSpan.dataset.byteIndex = byteIndex;
+                        byteSpan.textContent = byteHex + ' ';
+                        hexBytes.appendChild(byteSpan);
+                    } else {
+                        hexBytes.textContent += '   ';
+                    }
+                }
+                hexLine.appendChild(hexBytes);
+
+                // ASCII representation
+                const asciiBytes = document.createElement('div');
+                asciiBytes.className = 'ascii';
+                let asciiString = '';
+                for (let j = 0; j < bytesPerLine; j++) {
+                    const byteIndex = i + j;
+                    if (byteIndex < byteArray.length) {
+                        const byte = byteArray[byteIndex];
+                        asciiString += byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.';
+                    }
+                }
+                asciiBytes.textContent = asciiString;
+                hexLine.appendChild(asciiBytes);
+
+                hexEditor.appendChild(hexLine);
+            }
+        }
+
+        // Highlighting functionality
+        document.getElementById('highlightButton').addEventListener('click', function() {
+            const sequenceInput = document.getElementById('byteSequence').value.trim();
+            const highlightColor = document.getElementById('highlightColor').value;
+            
+            if (!sequenceInput) {
+                alert("Please enter a valid byte sequence.");
+                return;
+            }
+
+            const sequenceBytes = sequenceInput.split(' ').map(hex => parseInt(hex, 16));
+            highlightSequence(byteArray, sequenceBytes, highlightColor);
+
+            // Add to highlight list
+            addHighlightToList(sequenceInput, highlightColor);
+        });
+
+        function highlightSequence(byteArray, sequenceBytes, color) {
+            const byteElements = document.querySelectorAll('.byte');
+            const sequenceLength = sequenceBytes.length;
+
+            for (let i = 0; i <= byteArray.length - sequenceLength; i++) {
+                let match = true;
+                for (let j = 0; j < sequenceLength; j++) {
+                    if (byteArray[i + j] !== sequenceBytes[j]) {
+                        match = false;
+                        break;
+                    }
+                }
+
+                if (match) {
+                    for (let j = 0; j < sequenceLength; j++) {
+                        const byteIndex = i + j;
+                        const byteElement = document.querySelector(`.byte[data-byte-index="${byteIndex}"]`);
+                        if (byteElement) {
+                            byteElement.style.backgroundColor = color;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Function to add highlights to the list
+        function addHighlightToList(byteSequence, color) {
+            const highlightListDiv = document.getElementById('highlightList');
+
+            // Create a new highlight item
+            const highlightItem = document.createElement('div');
+            highlightItem.className = 'highlight-item';
+
+            // Color box
+            const colorBox = document.createElement('div');
+            colorBox.className = 'color-box';
+            colorBox.style.backgroundColor = color;
+            highlightItem.appendChild(colorBox);
+
+            // Label input
+            const labelInput = document.createElement('input');
+            labelInput.className = 'highlight-label';
+            labelInput.type = 'text';
+            labelInput.placeholder = 'Enter label';
+            labelInput.value = `Byte Sequence: ${byteSequence}`;
+            highlightItem.appendChild(labelInput);
+
+            // Append to the list
+            highlightListDiv.appendChild(highlightItem);
+
+            // Store the highlight
+            highlightList.push({
+                byteSequence,
+                color,
+                label: labelInput
+            });
+        }
+
+        // Hashing functionality
+        document.getElementById('hashButton').addEventListener('click', function() {
+            const text = document.getElementById('hashInput').value.trim();
+            if (!text) {
+                alert("Please enter some text to hash.");
+                return;
+            }
+
+            const hashValue = computeTextHashLowerCase(text);
+            const littleEndianHex = toLittleEndianHex(hashValue);
+
+            document.getElementById('hashOutput').textContent = `Hash: ${littleEndianHex}`;
+        });
+
+        function computeTextHashLowerCase(text) {
+            let hashValue = BigInt(-1);
+
+            for (let i = 0; i < text.length; i++) {
+                let charValue = BigInt(text.charCodeAt(i));
+
+                // Convert uppercase to lowercase
+                if (charValue >= BigInt(65) && charValue <= BigInt(90)) {
+                    charValue |= BigInt(0x20);
+                }
+
+                // Update hash
+                hashValue = charValue + hashValue * BigInt(0x21);
+            }
+
+            return hashValue;
+        }
+
+        function toLittleEndianHex(hashValue) {
+            const buffer = new ArrayBuffer(8);
+            const dataView = new DataView(buffer);
+            dataView.setBigUint64(0, hashValue, true); // true for little-endian
+            return Array.from(new Uint8Array(buffer))
+                .map(byte => byte.toString(16).padStart(2, '0'))
+                .join(' ');
+        }
+    </script>
+</body>
+</html>
