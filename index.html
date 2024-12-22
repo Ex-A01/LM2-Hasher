@@ -179,15 +179,16 @@
             }
 
             const sequenceBytes = sequenceInput.split(' ').map(hex => parseInt(hex, 16));
-            highlightSequence(byteArray, sequenceBytes, highlightColor);
+            const occurrences = highlightSequence(byteArray, sequenceBytes, highlightColor);
 
-            // Add to highlight list
-            addHighlightToList(sequenceInput, highlightColor);
+            // Add to highlight list with occurrences
+            addHighlightToList(sequenceInput, highlightColor, occurrences);
         });
 
         function highlightSequence(byteArray, sequenceBytes, color) {
             const byteElements = document.querySelectorAll('.byte');
             const sequenceLength = sequenceBytes.length;
+            let count = 0;
 
             for (let i = 0; i <= byteArray.length - sequenceLength; i++) {
                 let match = true;
@@ -199,6 +200,7 @@
                 }
 
                 if (match) {
+                    count++;
                     for (let j = 0; j < sequenceLength; j++) {
                         const byteIndex = i + j;
                         const byteElement = document.querySelector(`.byte[data-byte-index="${byteIndex}"]`);
@@ -208,10 +210,11 @@
                     }
                 }
             }
+            return count;
         }
 
         // Function to add highlights to the list
-        function addHighlightToList(byteSequence, color) {
+        function addHighlightToList(byteSequence, color, occurrences) {
             const highlightListDiv = document.getElementById('highlightList');
 
             // Create a new highlight item
@@ -224,12 +227,12 @@
             colorBox.style.backgroundColor = color;
             highlightItem.appendChild(colorBox);
 
-            // Label input
+            // Label with occurrences
             const labelInput = document.createElement('input');
             labelInput.className = 'highlight-label';
             labelInput.type = 'text';
-            labelInput.placeholder = 'Enter label';
-            labelInput.value = `Byte Sequence: ${byteSequence}`;
+            labelInput.readOnly = true;
+            labelInput.value = `Byte Sequence: ${byteSequence} | Occurrences: ${occurrences}`;
             highlightItem.appendChild(labelInput);
 
             // Append to the list
@@ -239,49 +242,8 @@
             highlightList.push({
                 byteSequence,
                 color,
-                label: labelInput
+                occurrences
             });
-        }
-
-        // Hashing functionality
-        document.getElementById('hashButton').addEventListener('click', function() {
-            const text = document.getElementById('hashInput').value.trim();
-            if (!text) {
-                alert("Please enter some text to hash.");
-                return;
-            }
-
-            const hashValue = computeTextHashLowerCase(text);
-            const littleEndianHex = toLittleEndianHex(hashValue);
-
-            document.getElementById('hashOutput').textContent = `Hash: ${littleEndianHex}`;
-        });
-
-        function computeTextHashLowerCase(text) {
-            let hashValue = BigInt(-1);
-
-            for (let i = 0; i < text.length; i++) {
-                let charValue = BigInt(text.charCodeAt(i));
-
-                // Convert uppercase to lowercase
-                if (charValue >= BigInt(65) && charValue <= BigInt(90)) {
-                    charValue |= BigInt(0x20);
-                }
-
-                // Update hash
-                hashValue = charValue + hashValue * BigInt(0x21);
-            }
-
-            return hashValue;
-        }
-
-        function toLittleEndianHex(hashValue) {
-            const buffer = new ArrayBuffer(8);
-            const dataView = new DataView(buffer);
-            dataView.setBigUint64(0, hashValue, true); // true for little-endian
-            return Array.from(new Uint8Array(buffer))
-                .map(byte => byte.toString(16).padStart(2, '0'))
-                .join(' ');
         }
     </script>
 </body>
