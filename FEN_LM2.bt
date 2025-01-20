@@ -1,0 +1,178 @@
+//------------------------------------------------
+//--- 010 Editor v15.0.1 Binary Template
+//
+//      File: 
+//   Authors: 
+//   Version: 
+//   Purpose: 
+//  Category: 
+// File Mask: 
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+struct LayerEntry;
+struct LayerChild;
+struct LayerData;
+struct Layer;
+
+LittleEndian();
+
+const uint UNUSED_OFFSET = 4294967295;
+
+
+typedef struct TextureMap
+{
+    uint leftSiblingOffset; 
+    uint rightSiblingOffset;
+    uint unk;
+    uint hash;
+    float values[7]; 
+  
+    local uint start_pos = FTell();
+    
+    FSeek(start_pos);
+};
+
+typedef struct Layer
+{
+    local uint start_pos = FTell();
+  
+    uint parentOffset;
+    uint hash;
+    byte flag1;
+    byte flag2;
+    byte flag3;
+    byte pad;
+  
+    uint leftSiblingOffset; 
+    uint rightSiblingOffset;
+    
+    float transform[16];
+    float transform2[16];
+    float values[14];
+    uint unk;   
+    uint unk;   
+    uint colorMaybe;   
+    uint unk;   
+    float unk;
+    float unk;
+    float unk;
+    uint unk;   
+
+    if (flag1 == 9)
+    {
+        uint unk;
+        float unk;
+        uint unk;
+        return;
+    }
+    
+    if (flag1 == 1)
+    {
+        uint nextOffset;
+        if (nextOffset != UNUSED_OFFSET)
+        {
+            FSeek(16 + nextOffset);
+            Layer nextLayer;
+        }
+    }
+    if (flag1 == 2)
+    {
+        uint textureMapOffset;
+        uint textureMapCount; 
+         
+        if (textureMapOffset != UNUSED_OFFSET)
+        {
+            FSeek(16 + textureMapOffset);
+            TextureMap textureMap[textureMapCount];
+        }
+    }
+  
+    if (parentOffset > start_pos && parentOffset != UNUSED_OFFSET)
+    {
+        FSeek(parentOffset + 16);
+        Layer parentLayer;
+    }
+  
+    if (child_depth > 0 && leftSiblingOffset != rightSiblingOffset)
+    {
+        child_depth--;
+        
+        FSeek(leftSiblingOffset + 16);
+        Layer nextLayer;
+    }
+  
+    FSeek(start_pos);
+};
+
+struct Header
+{
+    char magic[4];
+    uint unk; // Always 1
+    uint pointerListOffset;
+    uint pointerListSize;
+}header<bgcolor=0xFFADFF>;
+
+struct Layout
+{
+    uint pad;
+    uint presentationOffset;
+    uint textureMapSection; 
+    uint offset3; 
+    uint hash;
+    uint unk;
+    
+    struct LayoutPresentation
+    {
+        uint unk; // 0
+        uint hash;
+        uint leftSiblingOffset; 
+        uint rightSiblingOffset;
+        uint groupCount;
+    }presentation;
+    
+    local int child_depth = 30;
+    local int mat_child_depth = 30;
+    local int root_child_depth = 30;
+
+    struct LayoutGroupList
+    {
+        uint groupOffset;
+        uint hash;
+        uint unk;
+        uint groupOffset2;
+        uint unk;   
+        float unk;   
+        float unk;
+        float unk;   
+        float unk;   
+        uint unk;   
+        uint unk;   
+        uint unk;   
+        uint unk;   
+        uint unkOffset1;
+        
+        local uint start_pos1 = FTell();
+        
+        if (groupOffset != UNUSED_OFFSET)
+        {
+            FSeek(16 + groupOffset);
+            Layer layer;
+        }
+        
+        FSeek(start_pos1);
+        
+    }groups[presentation.groupCount] <optimize=false>;
+    
+
+}layout<bgcolor=0xFFADFF>;
+
+// Has to be added manually atm
+if (header.pointerListOffset + 16 >= FileSize())
+    return;
+
+// Some kind of pointer list? Relocation table?
+FSeek(header.pointerListOffset + 16);
+uint offsetPointers[header.pointerListSize / 4]<bgcolor=0xFFADFF>;
+
